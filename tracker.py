@@ -3,29 +3,46 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+import time
 
 def get_job_details(url):
-    response = requests.get(url, allow_redirects=True)        
-    soup = BeautifulSoup(response.text, 'html.parser')
-    # Extract job title
-    title = soup.find('h1').text.strip()
-    print(title)
+    while True:
+        try:
+            response = requests.get(url, allow_redirects=True)        
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Extract job title
+            title = soup.find('h1').text.strip()
+            
+            print(title)
 
-    ## Extract Company Name
-    company_name = soup.find('a', class_="topcard__org-name-link").text.strip()
-    print(company_name)
-    
-    # Extract job description
-    article_elem = soup.find('div', class_="description__text")
-    description=article_elem.get_text(strip=True) if article_elem else "Job Description not found"
-    print(description)
+            ## Extract Company Name
+            company_name = soup.find('a', class_="topcard__org-name-link").text.strip()
+            print(company_name)
 
-    return title, company_name, description
+            ## Extract Location
+            location = soup.find('span', class_="topcard__flavor--bullet").text.strip()
+            print(location)
+            
+            # Extract job description
+            article_elem = soup.find('div', class_="description__text")
+            description=article_elem.get_text(strip=True) if article_elem else "Job Description not found"
+            print(description)
 
-def write_to_file(title, company_name, description):
+            return title, company_name, location, description
+        
+        except AttributeError:
+            print("Attribute Error Occurred, retrying...")
+            time.sleep(5)
+            continue
+        
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return None, None, None, None
+
+def write_to_file(title, company_name, location, description):
     # Get current year and month
     current_year = datetime.now().strftime("%Y")
-    current_month = datetime.now().strftime("%B")  # Use full month name
+    current_month = datetime.now().strftime("%B")
 
     folder_path = os.path.join(current_year, current_month, "Summary")
     os.makedirs(folder_path, exist_ok=True)
@@ -37,6 +54,7 @@ def write_to_file(title, company_name, description):
     # Write job details to Markdown file
     with open(file_path, 'w') as file:
         file.write(f"# {company_name} - {title}\n\n")
+        file.write(location+"\n")
         file.write(description.strip())
 
     print(f"Job details written to {file_path}")
@@ -47,7 +65,7 @@ def write_to_file(title, company_name, description):
 def update_summary_table(job_file_name):
     # Get current year and month
     current_year = datetime.now().strftime("%Y")
-    current_month = datetime.now().strftime("%B")  # Use full month name
+    current_month = datetime.now().strftime("%B")
 
     # Construct the full path for the main summary markdown file
     summary_file_path = os.path.join(current_year, current_month, "index.md")
@@ -68,6 +86,7 @@ def update_summary_table(job_file_name):
 
     print(f"Summary table updated in {summary_file_path}")
 
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 tracker.py <url>")
@@ -75,6 +94,10 @@ if __name__ == "__main__":
         
     url = sys.argv[1]
 
-    title, company_name, description = get_job_details(url)
+    title, company_name, location, description = get_job_details(url)
 
-    write_to_file(title, company_name, description)
+    if title is not None:
+        write_to_file(title, company_name, location, description)
+        print("Successfully retrieved job details.")
+    else:
+        print("Failed to retrieve job details.")
