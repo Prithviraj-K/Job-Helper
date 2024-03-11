@@ -1,11 +1,12 @@
 import os
 import sys
 import requests
+import subprocess
 from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 
-def get_job_details(url):
+def get_linkedin_job_details(url):
     while True:
         try:
             response = requests.get(url, allow_redirects=True)        
@@ -86,6 +87,24 @@ def update_summary_table(job_file_name):
 
     print(f"Summary table updated in {summary_file_path}")
 
+def handler(url):
+    # Check if the URL belongs to Workopolis
+    if "workopolis" in url:
+        print("Detected workopolis url, sending curl request...")
+        curl_command = ["curl", "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36", "-H", "Accept-Language: en-US,en;q=0.5", "-L", url]
+        curl_process = subprocess.Popen(curl_command, stdout=subprocess.PIPE)
+        curl_output, _ = curl_process.communicate()
+        soup = BeautifulSoup(curl_output, 'html.parser')
+        print(soup.title)
+    elif "linkedin" in url:
+        print("Detected linkedin url, sending request...")
+        title, company_name, location, description = get_linkedin_job_details(url)
+
+        if title is not None:
+            write_to_file(title, company_name, location, description)
+            print("Successfully retrieved job details.")
+        else:
+            print("Failed to retrieve job details.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -94,10 +113,4 @@ if __name__ == "__main__":
         
     url = sys.argv[1]
 
-    title, company_name, location, description = get_job_details(url)
-
-    if title is not None:
-        write_to_file(title, company_name, location, description)
-        print("Successfully retrieved job details.")
-    else:
-        print("Failed to retrieve job details.")
+    handler(url)
